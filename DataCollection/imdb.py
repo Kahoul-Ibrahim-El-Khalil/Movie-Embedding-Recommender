@@ -4,6 +4,9 @@ import pandas as pd
 OMDB_API_KEY = 'a86534ab'  # <-- Replace with your key
 OMDB_BASE_URL = 'http://www.omdbapi.com/'
 
+# Timeout in seconds for the request to complete
+TIMEOUT = 10  # You can adjust this value based on your preference
+
 def get_movie_info_from_omdb(title):
     params = {
         'apikey': OMDB_API_KEY,
@@ -12,7 +15,8 @@ def get_movie_info_from_omdb(title):
         'plot': 'full'  # Get full description
     }
     try:
-        response = requests.get(OMDB_BASE_URL, params=params)
+        # Adding timeout to the request to avoid hanging for too long
+        response = requests.get(OMDB_BASE_URL, params=params, timeout=TIMEOUT)
         data = response.json()
         if data.get('Response') == 'True':
             return {
@@ -23,7 +27,11 @@ def get_movie_info_from_omdb(title):
             }
         else:
             return None
-    except Exception:
+    except requests.exceptions.Timeout:
+        print(f"Request for {title} timed out. Skipping...")
+        return None
+    except Exception as e:
+        print(f"Error retrieving {title}: {e}")
         return None
 
 def get_movies_data(titles):
@@ -47,9 +55,10 @@ def search_not_present_movies(PresentDataFiles, Movies, FileName):
     # Find movies that need to be searched for
     moviesToSearchFor = []
     alreadyPresent = [] 
-    for movie in Movies :
+    for movie in Movies:
         if movie not in set_titles:
             moviesToSearchFor.append(movie)
+            print(f"Found: {movie}")
         else:
             alreadyPresent.append(movie)
 
@@ -68,13 +77,14 @@ def search_not_present_movies(PresentDataFiles, Movies, FileName):
     result.to_csv(FileName, index=False)
     
     return {
-        "Already Present":alreadyPresent,
+        "Already Present": alreadyPresent,
         "Failures": failures
-        }
+    }
     
 def main():
-    movies = ["Inception", "The Matrix", "Blade Runner"]
-    save_movies_to_csv(movies, "imdb_movies.csv")
+    movies = ["Inception", "The Matrix", "Blade Runner", "The Dark Knight"]
+    # Here, the CSV file name to save the movies data
+    search_not_present_movies(['imdb_movies.csv'], movies, "imdb_movies_combined.csv")
 
 if __name__ == "__main__":
     main()
