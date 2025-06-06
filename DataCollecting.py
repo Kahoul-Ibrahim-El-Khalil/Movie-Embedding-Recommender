@@ -3,8 +3,8 @@ import requests
 from typing import List, Union, Optional, Dict
 from urllib.parse import quote
 
-# Shared configuration
-OMDB_API_KEY = 'a86534ab'  # Consider using environment variables
+
+OMDB_API_KEY = 'a86534ab'  
 OMDB_BASE_URL = 'http://www.omdbapi.com/'
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
