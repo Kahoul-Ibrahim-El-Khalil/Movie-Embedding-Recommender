@@ -4,7 +4,7 @@ from typing import List, Union, Optional, Dict
 from urllib.parse import quote
 
 
-OMDB_API_KEY = 'a86534ab'  
+OMDB_API_KEY = '********'  
 OMDB_BASE_URL = 'http://www.omdbapi.com/'
 WIKIPEDIA_API_URL = "https://en.wikipedia.org/w/api.php"
 WIKIDATA_API_URL = "https://www.wikidata.org/w/api.php"
