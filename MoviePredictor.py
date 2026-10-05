@@ -1,43 +1,46 @@
+import hashlib
+from pathlib import Path
+
 import pandas as pd
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
 from sentence_transformers import SentenceTransformer
-from sklearn.preprocessing import LabelEncoder
 import joblib
 import plotly.graph_objects as go
 from sklearn.decomposition import PCA
 import numpy as np
 
 class MoviePredictor:
-    def __init__(self, 
-                 Raw_Data_Path="Data/data.csv", 
-                 Sentence_Transformer_Model="all-MiniLM-L6-v2", 
-                 Label_Encoding_Path="label_encoder.pkl",
-                 Embeddings_Path="movie_embeddings.pkl",
+    def __init__(self,
+                 Raw_Data_Path="Data/data.csv",
+                 Sentence_Transformer_Model="all-MiniLM-L6-v2",
+                 Label_Encoding_Path="label_encoder.pkl",  # kept for backward compat; no longer used
+                 Embeddings_Path=None,
                  Start_From_Raw_Data=False):
-        
+        del Label_Encoding_Path  # titles are matched by string; integer labels were never used
+
         self.sentence_transformer = SentenceTransformer(Sentence_Transformer_Model)
-        
-        if not Start_From_Raw_Data:
-            try:
-                self.label_encoder = joblib.load(Label_Encoding_Path)
-                self.embeddings = joblib.load(Embeddings_Path)
-                self.data = pd.read_csv(Raw_Data_Path)
-                print("Loaded available embeddings and encodings")
-            except Exception as e:
-                print(f"Loading saved data failed: {e}, starting from raw data")
-                Start_From_Raw_Data = True
-                
-        if Start_From_Raw_Data:
-            self.data = pd.read_csv(Raw_Data_Path)
-            self.label_encoder = LabelEncoder()
-            self.embeddings = self.sentence_transformer.encode(
-                self.data['Description'].tolist(), 
-                show_progress_bar=True
-            )
-            self.data['Label'] = self.label_encoder.fit_transform(self.data['Title'])
-            joblib.dump(self.label_encoder, Label_Encoding_Path)
-            joblib.dump(self.embeddings, Embeddings_Path)
+
+        data = pd.read_csv(Raw_Data_Path)
+        data["Description"] = data["Description"].fillna("").astype(str)
+        self.data = data[data["Description"].str.len() > 0].reset_index(drop=True)
+        texts = self.data["Description"].tolist()
+
+        key = hashlib.md5(("\x00".join([Sentence_Transformer_Model] + texts)).encode("utf-8")).hexdigest()[:12]
+        cache = Path(Embeddings_Path or f".cache/embeddings-{key}.pkl")
+
+        if cache.exists() and not Start_From_Raw_Data:
+            self.embeddings = joblib.load(cache)
+            if len(self.embeddings) != len(self.data):
+                print(f"Cache {cache} has {len(self.embeddings)} rows for {len(self.data)} movies; recomputing.")
+            else:
+                print(f"Loaded cached embeddings: {cache}")
+                self.result_data_frame = None
+                self.input_vector = None
+                return
+        self.embeddings = self.sentence_transformer.encode(texts, show_progress_bar=True)
+        cache.parent.mkdir(parents=True, exist_ok=True)
+        joblib.dump(self.embeddings, cache)
 
         self.result_data_frame = None
         self.input_vector = None
@@ -62,12 +65,13 @@ class MoviePredictor:
         
         top_vectors = self.sentence_transformer.encode(self.result_data_frame['Description'].tolist())
         vectors = np.vstack([self.input_vector, top_vectors])
-        
-        pca = PCA(n_components=3)
+
+        pca = PCA(n_components=min(3, len(vectors)))
         reduced_vectors = pca.fit_transform(vectors)
-        
+
         titles = ['<INPUT>'] + self.result_data_frame['Title'].tolist()
         scores = [1.0] + self.result_data_frame['Score'].tolist()
+        alphas = [min(max(s, 0.05), 1.0) for s in scores[1:]]
         
         fig = go.Figure()
         
@@ -78,7 +82,7 @@ class MoviePredictor:
             mode='markers+text',
             marker=dict(
                 size=[8 + 20 * score for score in scores[1:]],
-                color=[f"rgba(30,136,229,{score})" for score in scores[1:]],
+                color=[f"rgba(30,136,229,{a})" for a in alphas],
                 line=dict(width=1, color='DarkSlateGrey')
             ),
             text=titles[1:],
@@ -111,7 +115,7 @@ class MoviePredictor:
                 z=[reduced_vectors[0, 2], reduced_vectors[i, 2]],
                 mode='lines',
                 line=dict(
-                    color=f"rgba(150,150,150,{scores[i] * 0.7})",
+                    color=f"rgba(150,150,150,{min(max(scores[i] * 0.7, 0.05), 1.0)})",
                     width=1
                 ),
                 hoverinfo='none',

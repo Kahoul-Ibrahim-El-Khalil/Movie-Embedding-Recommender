@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Secrets (copy .env.example to .env)
+.env
+
+# Run directories: each runs/<name>/ holds config.json, model.pt, encoder,
+# catalog index and cached features for one training run (regenerable)
+runs/
+artifacts/
+artifacts_*/
+.cache/
+*.pkl
+*.pt
+model.pt
+movie_embeddings.pkl
+label_encoder.pkl
+movie_data_encoded.csv
+embedding_viz.html
+viz.html
+
+# Large raw dumps (fetch/document separately; keep repo small)
+# Uncomment if you do NOT want these in git:
+# Raw/16k_Movies.csv
+# Data/wiki_movie_plots_deduped.csv
+
+# Notebook state
+.ipynb_checkpoints/
+/__pycache__
+*.pyc
